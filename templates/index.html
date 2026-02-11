@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Server Monitoring Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🖥️ Server Monitoring Dashboard</h1>
+            <div id="last-update">Last updated: <span id="timestamp">-</span></div>
+        </header>
+
+        <div class="system-info">
+            <div class="info-card">
+                <span class="label">Hostname:</span>
+                <span class="value" id="hostname">-</span>
+            </div>
+            <div class="info-card">
+                <span class="label">OS:</span>
+                <span class="value" id="os">-</span>
+            </div>
+            <div class="info-card">
+                <span class="label">Platform:</span>
+                <span class="value" id="platform">-</span>
+            </div>
+            <div class="info-card">
+                <span class="label">Uptime:</span>
+                <span class="value" id="uptime">-</span>
+            </div>
+        </div>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <h2>CPU Usage</h2>
+                <div class="metric-value">
+                    <span class="value-large" id="cpu-percent">0</span>
+                    <span class="unit">%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="cpu-bar" style="width: 0%"></div>
+                </div>
+                <div class="metric-info">
+                    Cores: <span id="cpu-cores">0</span>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <h2>Memory Usage</h2>
+                <div class="metric-value">
+                    <span class="value-large" id="memory-percent">0</span>
+                    <span class="unit">%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="memory-bar" style="width: 0%"></div>
+                </div>
+                <div class="metric-info">
+                    <span id="memory-used">0</span> / <span id="memory-total">0</span>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <h2>Disk Usage</h2>
+                <div class="metric-value">
+                    <span class="value-large" id="disk-percent">0</span>
+                    <span class="unit">%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="disk-bar" style="width: 0%"></div>
+                </div>
+                <div class="metric-info">
+                    <span id="disk-used">0</span> / <span id="disk-total">0</span>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <h2>Network Traffic</h2>
+                <div class="network-stats">
+                    <div class="network-item">
+                        <span class="network-label">↑ Sent:</span>
+                        <span class="network-value" id="network-sent">0</span>
+                    </div>
+                    <div class="network-item">
+                        <span class="network-label">↓ Received:</span>
+                        <span class="network-value" id="network-recv">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="status-indicator">
+            <span class="status-dot" id="status-dot"></span>
+            <span id="status-text">Connecting...</span>
+        </div>
+    </div>
+
+    <script>
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return (bytes / Math.pow(k, i)).toFixed(2) + ' ' + sizes[i];
+        }
+
+        function formatUptime(seconds) {
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            
+            let result = '';
+            if (days > 0) result += days + 'd ';
+            if (hours > 0) result += hours + 'h ';
+            result += minutes + 'm';
+            return result;
+        }
+
+        function updateMetrics() {
+            fetch('/api/metrics')
+                .then(response => response.json())
+                .then(data => {
+                    // Update system info
+                    document.getElementById('hostname').textContent = data.hostname;
+                    document.getElementById('os').textContent = data.os;
+                    document.getElementById('platform').textContent = data.platform;
+                    document.getElementById('uptime').textContent = formatUptime(data.uptime);
+                    
+                    // Update timestamp
+                    const timestamp = new Date(data.timestamp);
+                    document.getElementById('timestamp').textContent = timestamp.toLocaleString();
+
+                    // Update CPU
+                    const cpuPercent = data.cpu_percent.toFixed(1);
+                    document.getElementById('cpu-percent').textContent = cpuPercent;
+                    document.getElementById('cpu-bar').style.width = cpuPercent + '%';
+                    document.getElementById('cpu-bar').className = 'progress-fill ' + getColorClass(cpuPercent);
+                    document.getElementById('cpu-cores').textContent = data.cpu_cores;
+
+                    // Update Memory
+                    const memPercent = data.memory_percent.toFixed(1);
+                    document.getElementById('memory-percent').textContent = memPercent;
+                    document.getElementById('memory-bar').style.width = memPercent + '%';
+                    document.getElementById('memory-bar').className = 'progress-fill ' + getColorClass(memPercent);
+                    document.getElementById('memory-used').textContent = formatBytes(data.memory_used);
+                    document.getElementById('memory-total').textContent = formatBytes(data.memory_total);
+
+                    // Update Disk
+                    const diskPercent = data.disk_percent.toFixed(1);
+                    document.getElementById('disk-percent').textContent = diskPercent;
+                    document.getElementById('disk-bar').style.width = diskPercent + '%';
+                    document.getElementById('disk-bar').className = 'progress-fill ' + getColorClass(diskPercent);
+                    document.getElementById('disk-used').textContent = formatBytes(data.disk_used);
+                    document.getElementById('disk-total').textContent = formatBytes(data.disk_total);
+
+                    // Update Network
+                    document.getElementById('network-sent').textContent = formatBytes(data.network_sent);
+                    document.getElementById('network-recv').textContent = formatBytes(data.network_recv);
+
+                    // Update status
+                    document.getElementById('status-dot').className = 'status-dot active';
+                    document.getElementById('status-text').textContent = 'Connected';
+                })
+                .catch(error => {
+                    console.error('Error fetching metrics:', error);
+                    document.getElementById('status-dot').className = 'status-dot error';
+                    document.getElementById('status-text').textContent = 'Connection Error';
+                });
+        }
+
+        function getColorClass(percent) {
+            if (percent < 60) return 'low';
+            if (percent < 80) return 'medium';
+            return 'high';
+        }
+
+        // Update metrics every 2 seconds
+        updateMetrics();
+        setInterval(updateMetrics, 2000);
+    </script>
+</body>
+</html>
